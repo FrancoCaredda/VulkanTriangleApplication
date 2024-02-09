@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <filesystem>
 
 typedef struct QueueFamilyIndices_t {
 	std::optional<uint32_t> graphicsIndex;
@@ -30,6 +31,7 @@ private:
 	void InitDevice();
 	void InitSwapchain();
 	void InitImageViews();
+	void InitPipeline();
 #ifdef _DEBUG
 	VkDebugUtilsMessengerCreateInfoEXT GetDebugCreateInfo() const noexcept;
 	void InitDebugger();
@@ -46,6 +48,8 @@ private:
 
 	std::vector<VkLayerProperties>& GetDeviceLayerProperties() const noexcept;
 	std::vector<VkExtensionProperties>& GetDeviceExtensionProperties() const noexcept;
+
+	std::vector<char> LoadShaderSource(const std::filesystem::path& path) const;
 
 	VkPresentModeKHR GetPresentMode() const noexcept;
 	VkSurfaceFormatKHR GetSurfaceFormat() const noexcept;
@@ -71,6 +75,9 @@ private:
 	VkQueue m_PresentationQueue;
 	VkSwapchainKHR m_Swapchain;
 	std::vector<VkImageView> m_ImageViews;
+	VkPipelineLayout m_PipelineLayout;
+	VkRenderPass m_RenderPass;
+	VkPipeline m_Pipeline;
 #ifdef _DEBUG
 	VkDebugUtilsMessengerEXT m_DebugMessenger;
 #endif
