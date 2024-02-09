@@ -28,6 +28,7 @@ private:
 	void InitSurface();
 	void SelectDevice();
 	void InitDevice();
+	void InitSwapchain();
 #ifdef _DEBUG
 	VkDebugUtilsMessengerCreateInfoEXT GetDebugCreateInfo() const noexcept;
 	void InitDebugger();
@@ -44,6 +45,10 @@ private:
 
 	std::vector<VkLayerProperties>& GetDeviceLayerProperties() const noexcept;
 	std::vector<VkExtensionProperties>& GetDeviceExtensionProperties() const noexcept;
+
+	VkPresentModeKHR GetPresentMode() const noexcept;
+	VkSurfaceFormatKHR GetSurfaceFormat() const noexcept;
+	VkExtent2D GetExtent2D() const noexcept;
 
 	void PrintLayersAndExtensions() const noexcept;
 
@@ -63,6 +68,7 @@ private:
 	VkDevice m_Device;
 	VkQueue m_GraphicsQueue;
 	VkQueue m_PresentationQueue;
+	VkSwapchainKHR m_Swapchain;
 #ifdef _DEBUG
 	VkDebugUtilsMessengerEXT m_DebugMessenger;
 #endif

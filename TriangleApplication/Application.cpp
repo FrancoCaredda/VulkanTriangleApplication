@@ -1,6 +1,7 @@
 #include "Application.h"
 
 #include <stdexcept>
+#include <algorithm>
 #include <iostream>
 
 #ifdef _DEBUG
@@ -29,7 +30,9 @@ static VkResult DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsM
 
 Application::~Application()
 {
+	vkDestroySwapchainKHR(m_Device, m_Swapchain, nullptr);
 	vkDestroyDevice(m_Device, nullptr);
+	vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
 #ifdef _DEBUG
 	DestroyDebugUtilsMessengerEXT(m_Instance, m_DebugMessenger, nullptr);
 #endif
@@ -46,6 +49,7 @@ void Application::Run()
 	InitSurface();
 	SelectDevice();
 	InitDevice();
+	InitSwapchain();
 
 	PrintLayersAndExtensions();
 #ifdef _DEBUG
@@ -170,6 +174,10 @@ void Application::SelectDevice()
 
 void Application::InitDevice()
 {
+	const char* extensions[] = {
+		"VK_KHR_swapchain"
+	};
+
 	float priority = 1.0;
 	
 	uint32_t queueIndices[] = {
@@ -192,14 +200,13 @@ void Application::InitDevice()
 	VkPhysicalDeviceFeatures features{};
 	vkGetPhysicalDeviceFeatures(m_PhysicalDevice, &features);
 
-
 	VkDeviceCreateInfo deviceInfo{};
 	deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	deviceInfo.queueCreateInfoCount = sizeof(queueIndices) / sizeof(uint32_t);
 	deviceInfo.pQueueCreateInfos = queueCreateInfos;
 	deviceInfo.ppEnabledLayerNames = nullptr;
-	deviceInfo.ppEnabledExtensionNames = nullptr;
-	deviceInfo.enabledExtensionCount = 0;
+	deviceInfo.ppEnabledExtensionNames = extensions;
+	deviceInfo.enabledExtensionCount = sizeof(extensions) / sizeof(const char*);
 	deviceInfo.pEnabledFeatures = &features;
 
 #ifdef _DEBUG
@@ -219,6 +226,54 @@ void Application::InitDevice()
 
 	vkGetDeviceQueue(m_Device, m_Indices.graphicsIndex.value(), 0, &m_GraphicsQueue);
 	vkGetDeviceQueue(m_Device, m_Indices.presentationIndex.value(), 0, &m_PresentationQueue);
+}
+
+void Application::InitSwapchain()
+{
+	uint32_t queueIndices[] = {
+		m_Indices.graphicsIndex.value(),
+		m_Indices.presentationIndex.value()
+	};
+
+
+	auto presentMode = GetPresentMode();
+	auto extent2d = GetExtent2D();
+	auto format = GetSurfaceFormat();
+
+	VkSurfaceCapabilitiesKHR surfaceCapabilities;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, m_Surface, &surfaceCapabilities);
+
+	VkSwapchainCreateInfoKHR swapchainInfo{};
+	swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	swapchainInfo.surface = m_Surface;
+	swapchainInfo.presentMode = presentMode;
+	swapchainInfo.imageExtent = extent2d;
+	swapchainInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	swapchainInfo.imageFormat = format.format;
+	swapchainInfo.imageColorSpace = format.colorSpace;
+	swapchainInfo.imageArrayLayers = 1;
+	swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	swapchainInfo.minImageCount = surfaceCapabilities.minImageCount;
+	swapchainInfo.clipped = VK_FALSE;
+	swapchainInfo.oldSwapchain = VK_NULL_HANDLE;
+
+	if ((queueIndices[0] == queueIndices[1]))
+	{
+		swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		swapchainInfo.pQueueFamilyIndices = nullptr;
+		swapchainInfo.queueFamilyIndexCount = 0;
+	}
+	else
+	{
+		swapchainInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		swapchainInfo.pQueueFamilyIndices = queueIndices;
+		swapchainInfo.queueFamilyIndexCount = 2; 
+	}
+	
+
+	if (vkCreateSwapchainKHR(m_Device, &swapchainInfo, nullptr, &m_Swapchain) != VK_SUCCESS)
+		throw std::runtime_error::exception("Swapchain hasn't been created!");
 }
 
 #ifdef _DEBUG
@@ -317,6 +372,61 @@ std::vector<VkExtensionProperties>& Application::GetDeviceExtensionProperties() 
 	}
 
 	return properties;
+}
+
+VkPresentModeKHR Application::GetPresentMode() const noexcept
+{
+	uint32_t count;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, m_Surface, &count, nullptr);
+
+	std::vector<VkPresentModeKHR> presentModes(count);
+	vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, m_Surface, &count, presentModes.data());
+
+	if (std::find(presentModes.cbegin(), presentModes.cend(), VK_PRESENT_MODE_MAILBOX_KHR) != presentModes.cend())
+		return VK_PRESENT_MODE_MAILBOX_KHR;
+
+	return VK_PRESENT_MODE_FIFO_KHR;
+}
+
+VkSurfaceFormatKHR Application::GetSurfaceFormat() const noexcept
+{
+	uint32_t count;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, m_Surface, &count, nullptr);
+
+	std::vector<VkSurfaceFormatKHR> formats(count);
+	vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, m_Surface, &count, formats.data());
+
+	for (auto& format : formats)
+	{
+		if (format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR && format.format == VK_FORMAT_B8G8R8_SRGB)
+			return format;
+	}
+
+	return formats[0];
+}
+
+VkExtent2D Application::GetExtent2D() const noexcept
+{
+	VkSurfaceCapabilitiesKHR surfaceCapabilities;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, m_Surface, &surfaceCapabilities);
+
+	if (surfaceCapabilities.currentExtent.width == std::numeric_limits<uint32_t>::max()) 
+	{
+		return surfaceCapabilities.currentExtent;
+	}
+
+	int width, height;
+	glfwGetFramebufferSize(m_Window, &width, &height);
+
+	VkExtent2D extent{};
+	extent.width = std::clamp(static_cast<uint32_t>(width), 
+							  surfaceCapabilities.minImageExtent.width, 
+							  surfaceCapabilities.currentExtent.width);
+	extent.height = std::clamp(static_cast<uint32_t>(width),
+							   surfaceCapabilities.minImageExtent.height,
+							   surfaceCapabilities.currentExtent.height);
+
+	return extent;
 }
 
 void Application::PrintLayersAndExtensions() const noexcept
