@@ -29,6 +29,7 @@ private:
 	void SelectDevice();
 	void InitDevice();
 	void InitSwapchain();
+	void InitImageViews();
 #ifdef _DEBUG
 	VkDebugUtilsMessengerCreateInfoEXT GetDebugCreateInfo() const noexcept;
 	void InitDebugger();
@@ -69,9 +70,14 @@ private:
 	VkQueue m_GraphicsQueue;
 	VkQueue m_PresentationQueue;
 	VkSwapchainKHR m_Swapchain;
+	std::vector<VkImageView> m_ImageViews;
 #ifdef _DEBUG
 	VkDebugUtilsMessengerEXT m_DebugMessenger;
 #endif
+
+	VkSurfaceFormatKHR m_Format;
+	VkPresentModeKHR m_PresentMode;
+	VkExtent2D m_Extent;
 
 	QueueFamilyIndices m_Indices;
 };

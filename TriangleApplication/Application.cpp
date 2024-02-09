@@ -30,6 +30,9 @@ static VkResult DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsM
 
 Application::~Application()
 {
+	for (auto imageView : m_ImageViews)
+		vkDestroyImageView(m_Device, imageView, nullptr);
+
 	vkDestroySwapchainKHR(m_Device, m_Swapchain, nullptr);
 	vkDestroyDevice(m_Device, nullptr);
 	vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
@@ -50,6 +53,7 @@ void Application::Run()
 	SelectDevice();
 	InitDevice();
 	InitSwapchain();
+	InitImageViews();
 
 	PrintLayersAndExtensions();
 #ifdef _DEBUG
@@ -236,9 +240,9 @@ void Application::InitSwapchain()
 	};
 
 
-	auto presentMode = GetPresentMode();
-	auto extent2d = GetExtent2D();
-	auto format = GetSurfaceFormat();
+	m_PresentMode = GetPresentMode();
+	m_Extent = GetExtent2D();
+	m_Format = GetSurfaceFormat();
 
 	VkSurfaceCapabilitiesKHR surfaceCapabilities;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, m_Surface, &surfaceCapabilities);
@@ -246,12 +250,12 @@ void Application::InitSwapchain()
 	VkSwapchainCreateInfoKHR swapchainInfo{};
 	swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	swapchainInfo.surface = m_Surface;
-	swapchainInfo.presentMode = presentMode;
-	swapchainInfo.imageExtent = extent2d;
+	swapchainInfo.presentMode = m_PresentMode;
+	swapchainInfo.imageExtent = m_Extent;
 	swapchainInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 	swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	swapchainInfo.imageFormat = format.format;
-	swapchainInfo.imageColorSpace = format.colorSpace;
+	swapchainInfo.imageFormat = m_Format.format;
+	swapchainInfo.imageColorSpace = m_Format.colorSpace;
 	swapchainInfo.imageArrayLayers = 1;
 	swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	swapchainInfo.minImageCount = surfaceCapabilities.minImageCount;
@@ -274,6 +278,37 @@ void Application::InitSwapchain()
 
 	if (vkCreateSwapchainKHR(m_Device, &swapchainInfo, nullptr, &m_Swapchain) != VK_SUCCESS)
 		throw std::runtime_error::exception("Swapchain hasn't been created!");
+}
+
+void Application::InitImageViews()
+{
+	uint32_t count;
+	vkGetSwapchainImagesKHR(m_Device, m_Swapchain, &count, nullptr);
+
+	std::vector<VkImage> images(count);
+	vkGetSwapchainImagesKHR(m_Device, m_Swapchain, &count, images.data());
+
+	m_ImageViews.resize(count);
+	for (int i = 0; i < images.size(); i++)
+	{
+		VkImageViewCreateInfo imageViewInfo{};
+		imageViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		imageViewInfo.image = image;
+		imageViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewInfo.format = m_Format.format;
+		imageViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		imageViewInfo.subresourceRange.baseArrayLayer = 0;
+		imageViewInfo.subresourceRange.baseMipLevel = 0;
+		imageViewInfo.subresourceRange.layerCount = 1;
+		imageViewInfo.subresourceRange.levelCount = 1;
+		imageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+
+		if (vkCreateImageView(m_Device, &imageViewInfo, nullptr, &m_ImageViews[i]) != VK_SUCCESS)
+			throw std::runtime_error::exception("An image view hasn't been created!");
+	}
 }
 
 #ifdef _DEBUG
