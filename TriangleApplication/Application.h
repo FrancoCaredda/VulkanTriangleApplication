@@ -35,6 +35,7 @@ private:
 	void InitFramebuffers();
 	void InitCommandPool();
 	void InitCommandBuffer();
+	void InitSynchObjects();
 
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 #ifdef _DEBUG
@@ -63,6 +64,7 @@ private:
 	void PrintLayersAndExtensions() const noexcept;
 
 	void RunMainLoop();
+	void DrawFrame();
 private:
 	int m_Width = 600,
 		m_Height = 400;
@@ -86,6 +88,9 @@ private:
 	std::vector<VkFramebuffer> m_Framebuffers;
 	VkCommandPool m_CommandPool;
 	VkCommandBuffer m_CommandBuffer;
+	VkSemaphore m_ImageAvailable;
+	VkSemaphore m_RenderFinished;
+	VkFence m_InFlight;
 #ifdef _DEBUG
 	VkDebugUtilsMessengerEXT m_DebugMessenger;
 #endif

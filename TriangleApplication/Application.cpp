@@ -31,6 +31,9 @@ static VkResult DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsM
 
 Application::~Application()
 {
+	vkDestroySemaphore(m_Device, m_ImageAvailable, nullptr);
+	vkDestroySemaphore(m_Device, m_RenderFinished, nullptr);
+	vkDestroyFence(m_Device, m_InFlight, nullptr);
 	vkFreeCommandBuffers(m_Device, m_CommandPool, 1, &m_CommandBuffer);
 	vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
 	for (auto framebuffer : m_Framebuffers)
@@ -68,6 +71,7 @@ void Application::Run()
 	InitFramebuffers();
 	InitCommandPool();
 	InitCommandBuffer();
+	InitSynchObjects();
 
 	PrintLayersAndExtensions();
 #ifdef _DEBUG
@@ -470,6 +474,17 @@ void Application::InitPipeline()
 	renderPassCreateInfo.pSubpasses = &subpass;
 	renderPassCreateInfo.subpassCount = 1;
 
+	VkSubpassDependency dependency{};
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcAccessMask = 0;
+	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+	renderPassCreateInfo.dependencyCount = 1;
+	renderPassCreateInfo.pDependencies = &dependency;
+
 	if (vkCreateRenderPass(m_Device, &renderPassCreateInfo, nullptr, &m_RenderPass) != VK_SUCCESS)
 	{
 		vkDestroyShaderModule(m_Device, vertexShader, nullptr);
@@ -547,6 +562,21 @@ void Application::InitCommandBuffer()
 
 	if (vkAllocateCommandBuffers(m_Device, &commandBuffer, &m_CommandBuffer) != VK_SUCCESS)
 		throw std::runtime_error::exception("Command buffer hasn't been created!");
+}
+
+void Application::InitSynchObjects()
+{
+	VkSemaphoreCreateInfo semaphoreInfo{};
+	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	VkFenceCreateInfo fenceInfo{};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	if (vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_ImageAvailable) != VK_SUCCESS ||
+		vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_RenderFinished) != VK_SUCCESS ||
+		vkCreateFence(m_Device, &fenceInfo, nullptr, &m_InFlight) != VK_SUCCESS)
+		throw std::runtime_error::exception("A syncronization object hasn't been initialized!");
 }
 
 void Application::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
@@ -804,5 +834,45 @@ void Application::RunMainLoop()
 	while (!glfwWindowShouldClose(m_Window))
 	{
 		glfwPollEvents();
+		DrawFrame();
 	}
+
+	vkDeviceWaitIdle(m_Device);
+}
+
+void Application::DrawFrame()
+{
+	vkWaitForFences(m_Device, 1, &m_InFlight, VK_TRUE, UINT64_MAX);
+	vkResetFences(m_Device, 1, &m_InFlight);
+
+	uint32_t imageIndex;
+	vkAcquireNextImageKHR(m_Device, m_Swapchain, UINT64_MAX, m_ImageAvailable, nullptr, &imageIndex);
+
+	vkResetCommandBuffer(m_CommandBuffer, 0);
+	RecordCommandBuffer(m_CommandBuffer, imageIndex);
+
+	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.pWaitSemaphores = &m_ImageAvailable;
+	submitInfo.pWaitDstStageMask = waitStages;
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &m_CommandBuffer;
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = &m_RenderFinished;
+
+	if (vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, m_InFlight) != VK_SUCCESS)
+		throw std::runtime_error::exception("Can't submit commands to the queue!");
+
+	VkPresentInfoKHR presentInfo{};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = &m_RenderFinished;
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = &m_Swapchain;
+	presentInfo.pImageIndices = &imageIndex;
+
+	vkQueuePresentKHR(m_PresentationQueue, &presentInfo);
 }
