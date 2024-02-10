@@ -31,6 +31,11 @@ static VkResult DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsM
 
 Application::~Application()
 {
+	vkFreeCommandBuffers(m_Device, m_CommandPool, 1, &m_CommandBuffer);
+	vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
+	for (auto framebuffer : m_Framebuffers)
+		vkDestroyFramebuffer(m_Device, framebuffer, nullptr);
+
 	vkDestroyPipeline(m_Device, m_Pipeline, nullptr);
 	vkDestroyPipelineLayout(m_Device, m_PipelineLayout, nullptr);
 	vkDestroyRenderPass(m_Device, m_RenderPass, nullptr);
@@ -60,6 +65,9 @@ void Application::Run()
 	InitSwapchain();
 	InitImageViews();
 	InitPipeline();
+	InitFramebuffers();
+	InitCommandPool();
+	InitCommandBuffer();
 
 	PrintLayersAndExtensions();
 #ifdef _DEBUG
@@ -496,6 +504,93 @@ void Application::InitPipeline()
 
 	vkDestroyShaderModule(m_Device, vertexShader, nullptr);
 	vkDestroyShaderModule(m_Device, fragmentShader, nullptr);
+}
+
+void Application::InitFramebuffers()
+{
+	m_Framebuffers.resize(m_ImageViews.size());
+
+	for (int i = 0; i < m_ImageViews.size(); i++) 
+	{
+		VkFramebufferCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		createInfo.renderPass = m_RenderPass;
+		createInfo.width = m_Extent.width;
+		createInfo.height = m_Extent.height;
+		createInfo.pAttachments = &m_ImageViews[i];
+		createInfo.attachmentCount = 1;
+		createInfo.layers = 1;
+
+		if (vkCreateFramebuffer(m_Device, &createInfo, nullptr, &m_Framebuffers[i]) != VK_SUCCESS)
+			throw std::runtime_error::exception("A framebuffer hasn't been created!");
+	}
+}
+
+void Application::InitCommandPool()
+{
+	VkCommandPoolCreateInfo commandPool{};
+	commandPool.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	commandPool.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	commandPool.queueFamilyIndex = m_Indices.graphicsIndex.value();
+	
+	if (vkCreateCommandPool(m_Device, &commandPool, nullptr, &m_CommandPool) != VK_SUCCESS)
+		throw std::runtime_error::exception("Command pool hasn't been created!");
+}
+
+void Application::InitCommandBuffer()
+{
+	VkCommandBufferAllocateInfo commandBuffer{};
+	commandBuffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	commandBuffer.commandPool = m_CommandPool;
+	commandBuffer.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	commandBuffer.commandBufferCount = 1;
+
+	if (vkAllocateCommandBuffers(m_Device, &commandBuffer, &m_CommandBuffer) != VK_SUCCESS)
+		throw std::runtime_error::exception("Command buffer hasn't been created!");
+}
+
+void Application::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
+{
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	
+	if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+		throw std::runtime_error::exception("Can't begin recording the command buffer!");
+
+	VkRenderPassBeginInfo renderPassBeginInfo{};
+	renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassBeginInfo.renderPass = m_RenderPass;
+	renderPassBeginInfo.framebuffer = m_Framebuffers[imageIndex];
+	renderPassBeginInfo.renderArea.offset = { 0, 0 };
+	renderPassBeginInfo.renderArea.extent = m_Extent;
+
+	VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+	renderPassBeginInfo.clearValueCount = 1;
+	renderPassBeginInfo.pClearValues = &clearColor;
+
+	vkCmdBeginRenderPass(m_CommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = static_cast<float>(m_Extent.width);
+	viewport.height = static_cast<float>(m_Extent.height);
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor{};
+	scissor.extent = m_Extent;
+	scissor.offset = { 0, 0 };
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+	vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+	vkCmdEndRenderPass(commandBuffer);
+
+	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+		throw std::runtime_error("failed to record command buffer!");
 }
 
 #ifdef _DEBUG

@@ -32,6 +32,11 @@ private:
 	void InitSwapchain();
 	void InitImageViews();
 	void InitPipeline();
+	void InitFramebuffers();
+	void InitCommandPool();
+	void InitCommandBuffer();
+
+	void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 #ifdef _DEBUG
 	VkDebugUtilsMessengerCreateInfoEXT GetDebugCreateInfo() const noexcept;
 	void InitDebugger();
@@ -78,6 +83,9 @@ private:
 	VkPipelineLayout m_PipelineLayout;
 	VkRenderPass m_RenderPass;
 	VkPipeline m_Pipeline;
+	std::vector<VkFramebuffer> m_Framebuffers;
+	VkCommandPool m_CommandPool;
+	VkCommandBuffer m_CommandBuffer;
 #ifdef _DEBUG
 	VkDebugUtilsMessengerEXT m_DebugMessenger;
 #endif
