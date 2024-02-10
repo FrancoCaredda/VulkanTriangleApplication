@@ -14,10 +14,13 @@ To start working with Vulkan, some object has to be created:
 The `VkInstance` handle describes a connection with the Vulkan's driver.
 To create it, an instance of the `VkInstanceCreateInfo` structure has to be filled and the `vkCreateInstance` function has to be called.
 
-> Every single Vulkan object has its own CreateInfo structure and create/destroy functions.
-> Follow this pattern `Vk<object's name>CreateInfo` and `vkCreate<object's name>`/`vkDestroy<object's name>`
+> Every single Vulkan object has its own CreateInfo structure and create/destroy functions.  
+> Follow this pattern `Vk<object's name>CreateInfo` and `vkCreate<object's name>`/`vkDestroy<object's name>`.
 
-(Check the InitVulkanInstance function)[./TriangleApplication/Application.cpp]
+Extensions are additional dynamic libraries for Vulkan that add additional functionality.  
+Layers are additional functionality inside the application that can be disabled if you like.
+
+[Check the InitVkInstance function](./TriangleApplication/Application.cpp#L101)
 ### Creating a debug object
 ### Selecting a physical device
 ### Creating a logical device

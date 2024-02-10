@@ -100,17 +100,20 @@ void Application::InitWindow()
 
 void Application::InitVkInstance()
 {
-	// Vulkan Extensions and Layers
+	// Required Vulkan extensions
 	const char* extensions[] = {
 		"VK_EXT_debug_utils",
 		"VK_KHR_surface",
 		"VK_KHR_win32_surface"
 	};
 
+	// Required Vulkan layers
 	const char* layers[] = {
 		"VK_LAYER_KHRONOS_validation"
 	};
 
+	// Filling an additional stucture VkApplicationInfo 
+	// to provide the information about the application to the driver
 	VkApplicationInfo applicationInfo{};
 	applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	applicationInfo.apiVersion = VK_API_VERSION_1_3;
@@ -118,17 +121,18 @@ void Application::InitVkInstance()
 	applicationInfo.pEngineName = nullptr;
 	applicationInfo.pApplicationName = m_Title.c_str();
 
+	// Filling the VkInstanceCreateInfo structure to create VkInstance object
 	VkInstanceCreateInfo instanceInfo{};
 	instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	instanceInfo.pApplicationInfo = &applicationInfo;
-	instanceInfo.enabledExtensionCount = sizeof(extensions) / sizeof(const char*);
-	instanceInfo.ppEnabledExtensionNames = extensions;
+	instanceInfo.enabledExtensionCount = sizeof(extensions) / sizeof(const char*); // Extension count
+	instanceInfo.ppEnabledExtensionNames = extensions; // Required extensions
 
 #ifdef _DEBUG
 	VkDebugUtilsMessengerCreateInfoEXT debugInfo = GetDebugCreateInfo();
 
-	instanceInfo.enabledLayerCount = sizeof(layers) / sizeof(const char*);
-	instanceInfo.ppEnabledLayerNames = layers;
+	instanceInfo.enabledLayerCount = sizeof(layers) / sizeof(const char*); // Layer count
+	instanceInfo.ppEnabledLayerNames = layers; // Required layers
 
 	instanceInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugInfo;
 #else
@@ -136,6 +140,7 @@ void Application::InitVkInstance()
 	instanceInfo.ppEnabledLayerNames = nullptr;
 #endif // _DEBUG
 
+	// Creating the VkInstance object
 	if (vkCreateInstance(&instanceInfo, nullptr, &m_Instance) != VK_SUCCESS)
 		throw std::runtime_error::exception("Instance hasn't been created!");
 }
