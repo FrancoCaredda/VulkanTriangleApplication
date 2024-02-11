@@ -220,13 +220,14 @@ void Application::InitDevice()
 	};
 	VkDeviceQueueCreateInfo queueCreateInfos[2];
 
+	// Creating the queues
 	for (int i = 0; i < sizeof(queueIndices) / sizeof(uint32_t); i++)
 	{
 		VkDeviceQueueCreateInfo queueCreateInfo{};
 		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 		queueCreateInfo.queueFamilyIndex = queueIndices[i];
 		queueCreateInfo.queueCount = 1;
-		queueCreateInfo.pQueuePriorities = &priority;
+		queueCreateInfo.pQueuePriorities = &priority; // Defines how the queues of the same family will be scheduled
 
 		queueCreateInfos[i] = queueCreateInfo;
 	}
@@ -234,6 +235,7 @@ void Application::InitDevice()
 	VkPhysicalDeviceFeatures features{};
 	vkGetPhysicalDeviceFeatures(m_PhysicalDevice, &features);
 
+	// Creating the logical device
 	VkDeviceCreateInfo deviceInfo{};
 	deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	deviceInfo.queueCreateInfoCount = sizeof(queueIndices) / sizeof(uint32_t);
@@ -253,8 +255,6 @@ void Application::InitDevice()
 	deviceInfo.ppEnabledLayerNames = layers;
 #endif // _DEBUG
 
-	
-
 	if (vkCreateDevice(m_PhysicalDevice, &deviceInfo, nullptr, &m_Device) != VK_SUCCESS)
 		throw std::runtime_error::exception("Device hasn't been created!");
 
@@ -270,19 +270,20 @@ void Application::InitSwapchain()
 	};
 
 
-	m_PresentMode = GetPresentMode();
-	m_Extent = GetExtent2D();
-	m_Format = GetSurfaceFormat();
+	m_PresentMode = GetPresentMode(); // Defines how images are going to be submitted to the swapchain (used for the VSync)
+	m_Extent = GetExtent2D();         // Defines the images' size
+	m_Format = GetSurfaceFormat();    // Defines the images' colour format
 
 	VkSurfaceCapabilitiesKHR surfaceCapabilities;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, m_Surface, &surfaceCapabilities);
 
+	// Creating the swapchain
 	VkSwapchainCreateInfoKHR swapchainInfo{};
 	swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	swapchainInfo.surface = m_Surface;
 	swapchainInfo.presentMode = m_PresentMode;
 	swapchainInfo.imageExtent = m_Extent;
-	swapchainInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	swapchainInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR; // Applying some transformations like rotation, etc
 	swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	swapchainInfo.imageFormat = m_Format.format;
 	swapchainInfo.imageColorSpace = m_Format.colorSpace;
@@ -292,19 +293,18 @@ void Application::InitSwapchain()
 	swapchainInfo.clipped = VK_FALSE;
 	swapchainInfo.oldSwapchain = VK_NULL_HANDLE;
 
-	if ((queueIndices[0] == queueIndices[1]))
+	if ((queueIndices[0] == queueIndices[1])) // If the presentation family and the graphics family are the same
 	{
-		swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // Get the ownnership of the image
 		swapchainInfo.pQueueFamilyIndices = nullptr;
 		swapchainInfo.queueFamilyIndexCount = 0;
 	}
 	else
 	{
-		swapchainInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		swapchainInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT; // Otherwise, share it concurrently
 		swapchainInfo.pQueueFamilyIndices = queueIndices;
 		swapchainInfo.queueFamilyIndexCount = 2; 
 	}
-	
 
 	if (vkCreateSwapchainKHR(m_Device, &swapchainInfo, nullptr, &m_Swapchain) != VK_SUCCESS)
 		throw std::runtime_error::exception("Swapchain hasn't been created!");
@@ -321,6 +321,7 @@ void Application::InitImageViews()
 	m_ImageViews.resize(count);
 	for (int i = 0; i < images.size(); i++)
 	{
+		// Creating the ImageViews that define how to write to them
 		VkImageViewCreateInfo imageViewInfo{};
 		imageViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		imageViewInfo.image = images[i];
@@ -445,7 +446,7 @@ void Application::InitPipeline()
 	colorBlending.logicOpEnable = VK_FALSE;
 	colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
 	colorBlending.attachmentCount = 1;
-	colorBlending.pAttachments = &colorBlendAttachment;
+	colorBlending.pAttachments = &colorBlendAttachment; // The array of VkPipelineColorBlendAttachmentState provides the configuration of the blending stage for every framebuffer individually
 	colorBlending.blendConstants[0] = 0.0f; // Optional
 	colorBlending.blendConstants[1] = 0.0f; // Optional
 	colorBlending.blendConstants[2] = 0.0f; // Optional
@@ -462,7 +463,7 @@ void Application::InitPipeline()
 		throw std::runtime_error::exception("Pipeline layout hasn't been created!");
 	}
 
-	VkAttachmentDescription colorAttachment{};
+	VkAttachmentDescription colorAttachment{}; // Used to describe how to use the attached image
 	colorAttachment.format = m_Format.format;
 	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -470,18 +471,21 @@ void Application::InitPipeline()
 	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-	VkAttachmentReference colorAttachmentReference{};
-	colorAttachmentReference.attachment = 0;
+	VkAttachmentReference colorAttachmentReference{}; // Structure that provides the information about an attachment to the shaders
+	colorAttachmentReference.attachment = 0; // Index of the corresponding attachment in the renderPassCreateInfo.pAttachments array.
 	colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	VkSubpassDescription subpass{};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = &colorAttachmentReference;
+	subpass.pColorAttachments = &colorAttachmentReference; // Defines the array of attachments that is used as output parameters for the fragment shader layout(location = 0)
+														   // The first VkAttachmentReference corresponds to the first element of the pAttachments array of the render pass. See the line 484
 
 	VkRenderPassCreateInfo renderPassCreateInfo{};
 	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassCreateInfo.pAttachments = &colorAttachment;
+	renderPassCreateInfo.pAttachments = &colorAttachment; // This array contains the descriptions for each attachement (image) of the current frambuffer. 
+														  // The first VkAttachmentDescription corresponds to the first element of the pAttachments array of the current frambuffer. 
+														  // See InitFramebuffers line 551
 	renderPassCreateInfo.attachmentCount = 1;
 	renderPassCreateInfo.pSubpasses = &subpass;
 	renderPassCreateInfo.subpassCount = 1;
