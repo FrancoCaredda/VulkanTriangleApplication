@@ -153,11 +153,13 @@ void Application::InitSurface()
 
 void Application::SelectDevice()
 {
+	// The array of devices
 	std::vector<VkPhysicalDevice> devices;
 
 	uint32_t count;
 	vkEnumeratePhysicalDevices(m_Instance, &count, nullptr);
 
+	// Querying to the driver for the devices 
 	devices.resize(count);
 	vkEnumeratePhysicalDevices(m_Instance, &count, devices.data());
 
@@ -166,9 +168,12 @@ void Application::SelectDevice()
 		VkPhysicalDeviceProperties properties{};
 		VkPhysicalDeviceFeatures features{};
 
+		// Getting the device's properties
 		vkGetPhysicalDeviceProperties(device, &properties);
+		// Getting the device's features
 		vkGetPhysicalDeviceFeatures(device, &features);
 
+		// Selecting the last discrete GPU
 		if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
 			m_PhysicalDevice = device;
 	}
