@@ -186,6 +186,7 @@ void Application::SelectDevice()
 	uint32_t queueFamilyPropsCount;
 	vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyPropsCount, nullptr);
 
+	// Query queue family properties of the selected physical device.
 	familyProps.resize(queueFamilyPropsCount);
 	vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyPropsCount, familyProps.data());
 
@@ -193,6 +194,7 @@ void Application::SelectDevice()
 	{
 		auto& familyProp = familyProps[i];
 
+		// Checking if the presentation queues are supported
 		VkBool32 presentationQueueSupported;
 		vkGetPhysicalDeviceSurfaceSupportKHR(m_PhysicalDevice, i, m_Surface, &presentationQueueSupported);
 
